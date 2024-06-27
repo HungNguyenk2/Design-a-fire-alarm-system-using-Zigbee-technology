@@ -1,0 +1,132 @@
+#include <DHT.h>
+
+#define DHTPIN 33  // Chân tín hiệu của cảm biến nhiệt độ
+#define A0 32      // Chân tín hiệu của cảm biến khói
+#define A1 35      // Chân tín hiệu của cảm biến lửa
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+
+#define Baochuong 26 // Chân điều khiển báo chuông
+#define Xanuoc 27    // Chân điều khiển xả nước
+
+int dem_lua = 0; 
+int dem_khoi = 0;
+
+void setup() {
+    Serial.begin(9600);
+    dht.begin();
+    pinMode(Baochuong, OUTPUT);
+    pinMode(Xanuoc, OUTPUT);
+    pinMode(A0, INPUT);
+    pinMode(A1, INPUT);
+    delay(1000);
+} 
+
+// Hàm điều khiển output
+
+void baochuong() {
+    digitalWrite(Baochuong, HIGH);
+    digitalWrite(Xanuoc, LOW);
+}
+
+void xanuoc() {
+    digitalWrite(Baochuong, HIGH);
+    digitalWrite(Xanuoc, HIGH);
+}
+
+void offdevice() {
+    digitalWrite(Baochuong, LOW);
+    digitalWrite(Xanuoc, LOW);
+}
+
+// Hàm kiểm tra khói
+void checksmoke(int smoke) {
+    delay(1000);
+    Serial.print("Gia tri khoi: ");
+    Serial.println(smoke);    
+    Serial.print("Giá trị bộ đếm khói: ");
+    Serial.println(dem_khoi);
+    if (smoke > 1000) {   
+        dem_khoi++;
+        if (dem_khoi > 5) {  
+            xanuoc();
+            while (analogRead(A0) > 1000) { 
+                delay(1000);
+                Serial.print("Gia tri khoi: ");
+                Serial.println(analogRead(A0)); 
+                xanuoc();
+            }
+            offdevice();
+            dem_khoi = 0;
+            dem_lua  = 0;
+            checkfire(analogRead(A1));
+        } else {
+            baochuong();
+            checknhiet(dht.readTemperature());
+        }
+
+    } else {
+        offdevice();
+        dem_khoi = 0;
+        checkfire(analogRead(A1));
+    }
+}
+
+// Hàm kiểm tra nhiệt độ
+void checknhiet(float t) {
+    delay(2000);
+    Serial.print("Gia tri Nhiet: ");
+    Serial.println(t);
+  // float h = dht.readTemperature();
+
+  if (isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+  }
+    if (t > 35) { 
+        xanuoc();
+        dem_khoi = 0;
+        dem_lua  = 0;
+        checknhiet(dht.readTemperature());
+    } else {
+        checksmoke(analogRead(A0));
+    }
+}
+
+// Hàm kiểm tra lửa
+void checkfire(int fire) {
+    delay(1000);
+    Serial.print("Gia tri lua: ");
+    Serial.println(fire);
+    if (fire > 2000) {
+        Serial.print("Gia trị bộ đếm lửa: ");
+        Serial.println(dem_lua);
+        dem_lua++;
+        if (dem_lua > 5) {
+            baochuong();
+            dem_lua = 0;
+            dem_khoi = 0;
+            while (analogRead(A1) > 2000) {
+                delay(1000);
+                Serial.print("Gia tri Lua: ");
+                Serial.println(analogRead(A1)); 
+                xanuoc();
+            }
+            offdevice();
+            checknhiet(dht.readTemperature());
+        } else {
+            offdevice();
+            checknhiet(dht.readTemperature());
+        }
+
+    } else {
+        dem_lua = 0;
+        offdevice();
+        checksmoke(analogRead(A0));
+    }
+}
+
+void loop() {
+    checknhiet(dht.readTemperature());
+    checksmoke(analogRead(A0));
+}
