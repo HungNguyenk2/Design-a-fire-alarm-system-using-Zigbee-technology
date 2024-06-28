@@ -6,7 +6,7 @@
 #include <BlynkSimpleEsp32.h> 
 #include <DHT.h>
 #include <HardwareSerial.h>
-#include <String.h>
+#include <string.h>
 #include <Wire.h>
 #include <esp_sleep.h>
 
@@ -15,9 +15,9 @@
 #define A0 32      // Chân tín hiệu của cảm biến khói
 #define A1 35      // Chân tín hiệu của cảm biến lửa
 #define DHTTYPE DHT11
-#define LUA 1500
-#define KHOI 5000
-#define NHIET 35 
+#define LUA 3200
+#define KHOI 3500
+#define NHIET 33.5 
 
 DHT dht(DHTPIN, DHTTYPE);
  
@@ -27,8 +27,8 @@ DHT dht(DHTPIN, DHTTYPE);
 char auth[] = "09b_f0OBfHzFsh19WrAER1ju0_HPIemx";
 // Your WiFi credentials.
 // Set password to "" for open networks.
-char ssid[] = "OPPO A78";
-char pass[] = "88888888";
+char ssid[] = "snn";
+char pass[] = "namnamnam";
 
 int count = 0;
 int dem_lua = 0; 
@@ -54,11 +54,13 @@ String data = "From_1";
 void baochuong() {
     digitalWrite(Baochuong, HIGH);
     digitalWrite(Xanuoc, LOW);
+    delay(1000);
 }
 
 void xanuoc() {
     digitalWrite(Baochuong, HIGH);
     digitalWrite(Xanuoc, HIGH);
+    delay(1000);
 }
 
 void offdevice() {
@@ -70,14 +72,14 @@ void TruyenThongBaoChay(){
 
   // gửi dữ liệu đến tầng 2
 	String send_data = data + "*";
-	ZigbeeSerial.println(send_data);
+	ZigbeeSerial.print(send_data);
   Serial.println("Message sent to floor 2");
 
   // Đợi phản hồi từ tầng 2
   unsigned long startTime = millis();
   bool receiverAck =  false ;
 
-  while(millis() - startTime < 5000 ){ // wate 5 seconds
+  while((millis() - startTime)< 5000 ){ // wate 5 seconds
     if (ZigbeeSerial.available() > 0) {
       String Ack = ZigbeeSerial.readStringUntil('*');
       if( Ack == "Ack"){
@@ -87,21 +89,26 @@ void TruyenThongBaoChay(){
     }
   }
 
+  
   if (!receiverAck){
     // Nếu không nhạn được ACK từ tầng 2 , gửi trực tiếp đến tầng 3
     Serial.println ("No Ack from floor , sending to floor 3");
-    ZigbeeSerial.println(send_data);
+    ZigbeeSerial.print(send_data);
   }
+  delay(100);
 }
 
 
 void NhanThongBaoChay() {
 	String i;
 	i = ZigbeeSerial.readStringUntil('*'); //  i="From_2_To_1" or "From_3_To_1";
-	if(i == "From_2" ||i == "From_3"){
+	if((i == "From_2")||(i == "From_3")){
+    count=0;
     Serial.println(i);
+    Serial.println(" Co chay nhe  ");
 		baochuong();
 	}	
+  delay(100);
 }
 
 // Hàm kiểm tra khói
@@ -109,18 +116,17 @@ void checksmoke(int smoke) {
     Blynk.run();
     Blynk.virtualWrite(V1,smoke);
     NhanThongBaoChay();
-    delay(1000);
     Serial.print("Gia tri khoi: ");
     Serial.println(smoke);    
     Serial.print("Giá trị bộ đếm khói: ");
     Serial.println(dem_khoi);
-    if (smoke > KHOI) {   
+    if (smoke < KHOI) {   
         count=0;
         dem_khoi++;
         Blynk.virtualWrite(V3,"Floor 1 - Has Problem !!!");
         if (dem_khoi > 5) {  
             xanuoc();
-            while (analogRead(A0) > KHOI) { 
+            while (analogRead(A0) < KHOI) { 
                 Blynk.virtualWrite(V0,dht.readTemperature());
                 Blynk.virtualWrite(V1,analogRead(A0));
                 Blynk.virtualWrite(V2,analogRead(A1));
@@ -150,8 +156,9 @@ void checksmoke(int smoke) {
       if (count >= 5) {
         count = 0;
         goToSleep(5);
-    }else{
-      checkfire(analogRead(A1));
+      }else{
+        delay(1000);
+        checkfire(analogRead(A1));
     }
   }
 }
@@ -160,8 +167,7 @@ void checksmoke(int smoke) {
 void checknhiet(float t) {
     Blynk.run();
     Blynk.virtualWrite(V0,t);
-    NhanThongBaoChay();
-    delay(1000); 
+    NhanThongBaoChay(); 
     Serial.print("Gia tri Nhiet: ");
     Serial.println(t);
   // float h = dht.readTemperature();
@@ -181,6 +187,7 @@ void checknhiet(float t) {
         dem_lua  = 0;
         checknhiet(dht.readTemperature());
     } else {
+        delay(1000);
         checksmoke(analogRead(A0));
     }
 }
@@ -190,29 +197,28 @@ void checkfire(int fire) {
     Blynk.run();
     Blynk.virtualWrite(V2,analogRead(A1));
     NhanThongBaoChay();
-    delay(1000);
     Serial.print("Gia tri lua: ");
     Serial.println(fire);
-    if (fire > LUA) {
+    if (fire < LUA) {
         Blynk.virtualWrite(V3,"Floor 1 - Has Problem !!!");
         count=0;
         Serial.print("Gia trị bộ đếm lửa: ");
         Serial.println(dem_lua);
         dem_lua++;
-        if (dem_lua > 5) {
+        if (dem_lua >= 10) {
             baochuong();
             dem_lua = 0;
             dem_khoi = 0;
-            while (analogRead(A1) > LUA) {
+            while (analogRead(A1) < LUA) {
                 Blynk.virtualWrite(V3,"Floor 1 - Fireee !!!");
                 Blynk.virtualWrite(V0,dht.readTemperature());
                 Blynk.virtualWrite(V1,analogRead(A0));
                 Blynk.virtualWrite(V2,analogRead(A1));
                 TruyenThongBaoChay();
-                delay(1000);
                 Serial.print("Gia tri Lua: ");
                 Serial.println(analogRead(A1)); 
                 xanuoc();
+                delay(100);
             }
             offdevice();
             checknhiet(dht.readTemperature());
@@ -225,8 +231,10 @@ void checkfire(int fire) {
         Blynk.virtualWrite(V3,"Floor 1 - Stability!!!");
         dem_lua = 0;
         offdevice();
+        delay(1000);
         checksmoke(analogRead(A0));
     }
+
 }
 void goToSleep(int sleep_time_sec) {
     Serial.println("Going to sleep now");
@@ -239,22 +247,26 @@ void loop() {
     float temp = dht.readTemperature();
     int smoke = analogRead(A0);
     int fire = analogRead(A1);
+    NhanThongBaoChay();
     Blynk.run();
     Blynk.virtualWrite(V3,"Floor 1 - Stability!!!");
     Blynk.virtualWrite(V0,temp);
     Blynk.virtualWrite(V1,smoke);
     Blynk.virtualWrite(V2,fire);
 
-    if (smoke > KHOI || temp > NHIET || fire > LUA) {
+    if (smoke < KHOI || temp < NHIET || fire > LUA) {
         if (smoke > KHOI) {
+            Serial.print("Gia tri Khoi: ");
             Serial.println(smoke);
             checksmoke(smoke);
         }
         if (temp > NHIET) {
+            Serial.print("Gia tri Nhiet: ");
             Serial.println(temp);
             checknhiet(temp);
         }
         if (fire > LUA) {
+            Serial.print("Gia tri Lua: ");
             Serial.println(fire);
             checkfire(fire);
         }
@@ -263,10 +275,10 @@ void loop() {
         count++;
         Blynk.virtualWrite(V3,"Floor 1 - Stability!!!");
         Serial.println("No problem");
-        if (count >= 5) {
+        if (count >= 15) {
             count = 0;
             goToSleep(5); // Deep sleep for 10 seconds
         }
     }
-    delay(1000); // Độ trễ để tránh quá tải CPU
+    delay(100); // Độ trễ để tránh quá tải CPU
 }

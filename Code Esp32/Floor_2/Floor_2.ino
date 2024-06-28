@@ -1,5 +1,5 @@
 #include <SoftwareSerial.h>
-#include <string.h>
+#include <String.h>
 
 SoftwareSerial ZigbeeSerial(11, 10); // Rx :11, Tx :10
 
@@ -20,46 +20,62 @@ void setup() {
 
 void TruyenThongBaoChay_For_From2() {
     String send_data = data_2 + "*";
-    ZigbeeSerial.println(send_data);
+    ZigbeeSerial.print(send_data);
 }
 
 void NhanThongBaoChay() {
     if (ZigbeeSerial.available() > 0) {
         // Đọc dữ liệu từ tầng 1
         String data = ZigbeeSerial.readStringUntil('*');
-        Serial.println("Co chay tu tang 1");
+        Serial.print("Co_chay ");
         Serial.println(data);
 
         // Gửi ACk tới 
-        if (data == "From_1" || data == "From_3") {
-            delay(100);
-            ZigbeeSerial.println("Ack");
+        if (data == "From_1") {
+            ZigbeeSerial.print("Ack");
+            delay(3000);
             // Gửi dữ liệu đi
-            ZigbeeSerial.println(data);
+            ZigbeeSerial.print(data);
             batchuong();
         }
+        if (data == "From_3") {
+            ZigbeeSerial.print("Ack");
+            delay(3000);
+            // Gửi dữ liệu đi
+            ZigbeeSerial.print(data);
+            batchuong();
+        }
+    }else{
+      offdevice();
     }
+    delay(100);
 }
 
 // Output functions
 void batchuong() {
     digitalWrite(Batchuong, HIGH);
     digitalWrite(Xanuoc, LOW);
+    delay(1000);
 }
-
+void offdevice() {
+    digitalWrite(Batchuong, LOW);
+    digitalWrite(Xanuoc, LOW);
+}
 
 void checkfire(int fire) {
     Serial.print("Gia tri lua: ");
     Serial.println(fire);
-    if (fire > 500) {
+    if (fire < 210) {
        TruyenThongBaoChay_For_From2();
        batchuong();
+    }else{
+      offdevice();
     } 
 }
 
 void loop() {
     NhanThongBaoChay();
+    delay(1000);
     int fireValue = analogRead(A0); // Assuming A1 is used for the fire sensor
     checkfire(fireValue);
-    delay(1000);
 }
